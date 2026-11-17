@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>水库监控 · 三模型测试</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f2f5f8; color: #1f2937; }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 16px 14px 40px; }
+  h1 { font-size: 22px; margin: 6px 0 4px; }
+  .sub { color: #6b7280; font-size: 14px; margin: 0 0 16px; line-height: 1.6; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+  .tab { flex: 1; padding: 12px 4px; border: 2px solid #d1d5db; background: #fff; border-radius: 12px; font-size: 16px; cursor: pointer; text-align: center; }
+  .tab small { display: block; font-size: 12px; color: #6b7280; margin-top: 4px; line-height: 1.4; }
+  .tab.active { border-color: #2563eb; background: #eff6ff; }
+  .card { background: #fff; border-radius: 12px; padding: 14px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .upload-btn { display: block; width: 100%; padding: 14px; font-size: 17px; color: #fff; background: #2563eb; border: none; border-radius: 10px; cursor: pointer; }
+  .hint { color: #6b7280; font-size: 13px; margin: 8px 0 0; line-height: 1.6; }
+  #canvasWrap { text-align: center; }
+  #canvas { max-width: 100%; border-radius: 8px; background: #e5e7eb; }
+  .row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+  .row label { font-size: 14px; white-space: nowrap; }
+  input[type=range] { flex: 1; }
+  #confVal { font-size: 14px; min-width: 34px; text-align: right; }
+  .run-btn { display: block; width: 100%; padding: 14px; font-size: 17px; color: #fff; background: #16a34a; border: none; border-radius: 10px; cursor: pointer; }
+  .run-btn:disabled { background: #9ca3af; }
+  #status { font-size: 14px; color: #374151; min-height: 20px; margin: 10px 0 0; line-height: 1.6; }
+  #result { font-size: 16px; line-height: 1.7; }
+  #result b { font-size: 20px; }
+  .steps { font-size: 14px; line-height: 1.9; color: #374151; }
+  .samples { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .samples img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; cursor: pointer; border: 2px solid #e5e7eb; }
+  .samples img:hover { border-color: #2563eb; }
+  .samples p { grid-column: 1 / -1; margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6; }
+  .foot { font-size: 13px; color: #6b7280; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>水库监控 · 三模型测试</h1>
+  <p class="sub">传一张照片，就能看到模型框出什么。不用装任何东西，照片只在你的浏览器里算，不会上传。</p>
+
+  <div class="tabs">
+    <button class="tab active" data-model="debris">漂浮物<small>已训练好<br>100个能找到71个</small></button>
+    <button class="tab" data-model="person">人员<small>100个人<br>能找到70个</small></button>
+    <button class="tab" data-model="boat">船只<small>100条船<br>能找到54条</small></button>
+  </div>
+
+  <div class="card">
+    <button class="upload-btn" id="uploadBtn">📷 传一张自己的照片</button>
+    <input type="file" id="fileInput" accept="image/*" style="display:none">
+    <p class="hint" id="uploadHint">比如水面、坝区、岸边拍的照片。第一次用某个模型要先下载模型文件（漂浮物约 11 MB，人船约 81 MB），请耐心等一下。</p>
+    <div id="canvasWrap" style="margin-top:12px"><canvas id="canvas"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="steps" style="margin-bottom:8px">点一张试试（不用自己传照片）：</div>
+    <div class="samples">
+      <img src="samples/debris-1.jpg" data-model="debris" alt="漂浮物示例1">
+      <img src="samples/debris-2.jpg" data-model="debris" alt="漂浮物示例2">
+      <img src="samples/debris-3.jpg" data-model="debris" alt="漂浮物示例3">
+      <img src="samples/person-1.jpg" data-model="person" alt="人员示例1">
+      <img src="samples/person-2.jpg" data-model="person" alt="人员示例2">
+      <img src="samples/boat-1.jpg" data-model="boat" alt="船只示例1">
+      <img src="samples/boat-2.jpg" data-model="boat" alt="船只示例2">
+      <p>前面 3 张是漂浮物，中间 2 张是人员，后面 2 张是船只。点一张会自动选好对应的模型并开始检测。</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <label>灵敏度（门槛）</label>
+      <input type="range" id="conf" min="0.05" max="0.5" step="0.01" value="0.25">
+      <span id="confVal">0.25</span>
+    </div>
+    <p class="hint">门槛越低，找到的东西越多，但也越容易认错；门槛越高，越准，但容易漏掉。</p>
+    <button class="run-btn" id="runBtn" disabled>开始检测</button>
+    <p id="status"></p>
+    <div id="result"></div>
+  </div>
+
+  <div class="card">
+    <div class="steps">怎么用：<br>1. 上面选模型（漂浮物 / 人员 / 船只）<br>2. 传一张照片<br>3. 点“开始检测”，找到的东西会用彩框画出来</div>
+  </div>
+
+  <div class="card foot">
+    说明：<br>1）推理在你的浏览器本地跑，照片不会上传到任何服务器。<br>2）第一次用某个模型要下载模型文件，之后再测就很快了；人员和船只用的是同一个模型，来回切换不用重新下载。<br>3）这只是测试页，不是正式部署。正式部署跑在显卡上，多路摄像头 24 小时不停。<br>4）这个页面没有每天的次数限制，想测多少次都行。
+  </div>
+</div>
+
+<script>
+const ORT_MIRRORS = [
+  'https://registry.npmmirror.com/onnxruntime-web/1.20.1/files/dist/',
+  'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.20.1/dist/',
+  'https://unpkg.com/onnxruntime-web@1.20.1/dist/',
+  'https://cdnjs.cloudflare.com/ajax/libs/onnxruntime-web/1.20.1/'
+];
+
+const MODELS = {
+  debris: { file: 'models/debris-best-clean.onnx', name: '漂浮物', color: '#22c55e', conf: 0.25, cls: null },
+  person: { file: 'models/yolo11m.onnx', name: '人员', color: '#3b82f6', conf: 0.15, cls: 0 },
+  boat:   { file: 'models/yolo11m.onnx', name: '船只', color: '#f97316', conf: 0.15, cls: 8 }
+};
+
+let currentModel = 'debris';
+let currentImage = null;   // HTMLImageElement
+let sessions = {};         // file -> InferenceSession
+let ortReady = null;       // Promise<ort>
+
+const $ = id => document.getElementById(id);
+const statusEl = $('status'), resultEl = $('result'), runBtn = $('runBtn'), canvas = $('canvas'), ctx = canvas.getContext('2d');
+
+function setStatus(t) { statusEl.textContent = t || ''; }
+
+// ---- ONNX Runtime loader: try mirrors in order ----
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src; s.onload = resolve; s.onerror = () => reject(new Error('load fail ' + src));
+    document.head.appendChild(s);
+  });
+}
+async function getOrt() {
+  if (ortReady) return ortReady;
+  ortReady = (async () => {
+    if (window.ort) return window.ort;
+    for (const base of ORT_MIRRORS) {
+      try {
+        await loadScript(base + 'ort.min.js');
+        if (window.ort) {
+          ort.env.wasm.wasmPaths = base;
+          ort.env.wasm.numThreads = 4;
+          return window.ort;
+        }
+      } catch (e) { /* try next mirror */ }
+    }
+    throw new Error('检测组件没加载成功，可能是网络问题，请刷新页面重试');
+  })();
+  return ortReady;
+}
+// Preload runtime in background so first detection is faster
+getOrt().catch(() => {});
+
+// ---- model download with progress ----
+async function fetchWithProgress(url, onProgress) {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('模型文件下载失败（' + res.status + '），请刷新页面重试');
+  const total = parseInt(res.headers.get('content-length') || '0', 10);
+  if (!res.body || !total) {
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    onProgress(received / total);
+  }
+  return URL.createObjectURL(new Blob(chunks));
+}
+
+async function getSession(modelKey) {
+  const m = MODELS[modelKey];
+  if (sessions[m.file]) return sessions[m.file];
+  const ort = await getOrt();
+  setStatus('正在下载模型文件…');
+  const url = await fetchWithProgress(m.file, p => setStatus('正在下载模型文件…' + Math.round(p * 100) + '%'));
+  setStatus('正在把模型装进内存…');
+  const session = await ort.InferenceSession.create(url, { executionProviders: ['webgpu', 'wasm'] });
+  sessions[m.file] = session;
+  return session;
+}
+
+// ---- letterbox to 640 ----
+function letterbox(img) {
+  const S = 640;
+  const scale = Math.min(S / img.naturalWidth, S / img.naturalHeight);
+  const w = Math.round(img.naturalWidth * scale), h = Math.round(img.naturalHeight * scale);
+  const padX = Math.floor((S - w) / 2), padY = Math.floor((S - h) / 2);
+  const c = document.createElement('canvas');
+  c.width = S; c.height = S;
+  const cc = c.getContext('2d');
+  cc.fillStyle = 'rgb(114,114,114)';
+  cc.fillRect(0, 0, S, S);
+  cc.drawImage(img, padX, padY, w, h);
+  const data = cc.getImageData(0, 0, S, S).data;
+  const input = new Float32Array(3 * S * S);
+  for (let i = 0; i < S * S; i++) {
+    input[i] = data[i * 4] / 255;
+    input[S * S + i] = data[i * 4 + 1] / 255;
+    input[2 * S * S + i] = data[i * 4 + 2] / 255;
+  }
+  return { input, scale, padX, padY, w, h };
+}
+
+// ---- parse YOLO output [1, C, 8400], NMS 0.45 ----
+function parseOutput(data, dims, model, conf, scale, padX, padY, imgW, imgH) {
+  const C = dims[1], N = dims[2];
+  const boxes = [];
+  for (let i = 0; i < N; i++) {
+    let score, cls = 0;
+    if (model.cls === null) {
+      score = data[4 * N + i];
+    } else {
+      score = 0;
+      for (let c = 0; c < 80; c++) {
+        const s = data[(4 + c) * N + i];
+        if (s > score) { score = s; cls = c; }
+      }
+      if (cls !== model.cls) continue;
+    }
+    if (score < conf) continue;
+    const cx = data[0 * N + i], cy = data[1 * N + i], w = data[2 * N + i], h = data[3 * N + i];
+    let x1 = (cx - w / 2 - padX) / scale, y1 = (cy - h / 2 - padY) / scale;
+    let x2 = (cx + w / 2 - padX) / scale, y2 = (cy + h / 2 - padY) / scale;
+    x1 = Math.max(0, x1); y1 = Math.max(0, y1);
+    x2 = Math.min(imgW, x2); y2 = Math.min(imgH, y2);
+    if (x2 <= x1 || y2 <= y1) continue;
+    boxes.push({ x1, y1, x2, y2, score });
+  }
+  boxes.sort((a, b) => b.score - a.score);
+  const kept = [];
+  for (const b of boxes) {
+    let ok = true;
+    for (const k of kept) {
+      const ix1 = Math.max(b.x1, k.x1), iy1 = Math.max(b.y1, k.y1);
+      const ix2 = Math.min(b.x2, k.x2), iy2 = Math.min(b.y2, k.y2);
+      const iw = Math.max(0, ix2 - ix1), ih = Math.max(0, iy2 - iy1);
+      const inter = iw * ih;
+      const union = (b.x2 - b.x1) * (b.y2 - b.y1) + (k.x2 - k.x1) * (k.y2 - k.y1) - inter;
+      if (union > 0 && inter / union > 0.45) { ok = false; break; }
+    }
+    if (ok) kept.push(b);
+  }
+  return kept;
+}
+
+function drawResults(img, boxes, model) {
+  canvas.width = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  ctx.drawImage(img, 0, 0);
+  ctx.lineWidth = Math.max(2, img.naturalWidth / 400);
+  ctx.font = 'bold ' + Math.max(14, img.naturalWidth / 40) + 'px sans-serif';
+  for (const b of boxes) {
+    ctx.strokeStyle = model.color;
+    ctx.strokeRect(b.x1, b.y1, b.x2 - b.x1, b.y2 - b.y1);
+    const label = model.name + ' ' + b.score.toFixed(2);
+    const tw = ctx.measureText(label).width;
+    const th = Math.max(16, img.naturalWidth / 35);
+    ctx.fillStyle = model.color;
+    ctx.fillRect(b.x1, Math.max(0, b.y1 - th), tw + 10, th);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, b.x1 + 5, Math.max(th - 4, b.y1 - 5));
+  }
+}
+
+async function runDetection() {
+  if (!currentImage) { setStatus('请先传一张照片。'); return; }
+  const model = MODELS[currentModel];
+  const conf = parseFloat($('conf').value);
+  runBtn.disabled = true;
+  resultEl.innerHTML = '';
+  try {
+    setStatus('正在准备检测组件…');
+    const ort = await getOrt();
+    const session = await getSession(currentModel);
+    setStatus('正在检测…');
+    const lb = letterbox(currentImage);
+    const tensor = new ort.Tensor('float32', lb.input, [1, 3, 640, 640]);
+    const t0 = performance.now();
+    const out = await session.run({ images: tensor });
+    const dt = (performance.now() - t0) / 1000;
+    const o = out.output0;
+    const boxes = parseOutput(o.data, o.dims, model, conf, lb.scale, lb.padX, lb.padY, currentImage.naturalWidth, currentImage.naturalHeight);
+    drawResults(currentImage, boxes, model);
+    setStatus('');
+    if (boxes.length > 0) {
+      resultEl.innerHTML = '找到 <b>' + boxes.length + '</b> 个' + model.name + '，用时约 ' + dt.toFixed(1) + ' 秒（门槛 ' + conf + '）。';
+    } else {
+      resultEl.innerHTML = '这张图里没找到' + model.name + '，用时约 ' + dt.toFixed(1) + ' 秒。可以试试把门槛调低一点，或者换张图。';
+    }
+  } catch (e) {
+    setStatus('检测失败：' + (e && e.message ? e.message : '请刷新页面重试'));
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+// ---- UI wiring ----
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentModel = btn.dataset.model;
+    $('conf').value = MODELS[currentModel].conf;
+    $('confVal').textContent = MODELS[currentModel].conf;
+    resultEl.innerHTML = '';
+    if (currentImage) runDetection();
+  });
+});
+
+// ---- sample images: click to load + auto-detect ----
+document.querySelectorAll('.samples img').forEach(el => {
+  el.addEventListener('click', () => {
+    const mk = el.dataset.model;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.model === mk));
+    currentModel = mk;
+    $('conf').value = MODELS[mk].conf;
+    $('confVal').textContent = MODELS[mk].conf;
+    resultEl.innerHTML = '';
+    const img = new Image();
+    img.onload = () => { currentImage = img; runBtn.disabled = false; setStatus(''); runDetection(); };
+    img.onerror = () => setStatus('示例图没加载出来，请刷新页面重试。');
+    img.src = el.getAttribute('src');
+  });
+});
+
+$('uploadBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      currentImage = img;
+      runBtn.disabled = false;
+      resultEl.innerHTML = '';
+      setStatus('');
+      runDetection();
+    };
+    img.onerror = () => setStatus('这张照片打不开，请换一张试试。');
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(f);
+});
+
+$('conf').addEventListener('input', () => {
+  $('confVal').textContent = $('conf').value;
+});
+$('conf').addEventListener('change', () => {
+  if (currentImage && runBtn && !runBtn.disabled) runDetection();
+});
+runBtn.addEventListener('click', runDetection);
+</script>
+</body>
+</html>
