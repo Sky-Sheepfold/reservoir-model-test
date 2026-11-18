@@ -50,7 +50,7 @@
   <div class="card">
     <button class="upload-btn" id="uploadBtn">📷 传一张自己的照片</button>
     <input type="file" id="fileInput" accept="image/*" style="display:none">
-    <p class="hint" id="uploadHint">比如水面、坝区、岸边拍的照片。第一次用某个模型要先下载模型文件（漂浮物约 11 MB，人船约 81 MB），请耐心等一下。</p>
+    <p class="hint" id="uploadHint">比如水面、坝区、岸边拍的照片。第一次用某个模型要先下载模型文件（漂浮物约 11 MB，人船约 37 MB），请耐心等一下。</p>
     <div id="canvasWrap" style="margin-top:12px"><canvas id="canvas"></canvas></div>
   </div>
 
@@ -65,6 +65,19 @@
       <img src="samples/boat-1.jpg" data-model="boat" alt="船只示例1">
       <img src="samples/boat-2.jpg" data-model="boat" alt="船只示例2">
       <p>前面 3 张是漂浮物，中间 2 张是人员，后面 2 张是船只。点一张会自动选好对应的模型并开始检测。</p>
+    </div>
+    <div class="steps" style="margin: 14px 0 8px">新照片（模型以前没见过的，点一张就测）：</div>
+    <div class="samples">
+      <img src="server-examples/debris-4-river-litter.jpg" data-model="debris" alt="漂浮物新示例：河面垃圾">
+      <img src="server-examples/debris-5-danube-bottle.jpg" data-model="debris" alt="漂浮物新示例：河面瓶子">
+      <img src="server-examples/debris-6-plastic-persistence.jpg" data-model="debris" alt="漂浮物新示例：水面塑料">
+      <img src="server-examples/person-3-lake-walk.jpg" data-model="person" alt="人员新示例：湖边散步">
+      <img src="server-examples/person-4-lake-edward.jpg" data-model="person" alt="人员新示例：湖边渔民">
+      <img src="server-examples/person-5-yellowstone.jpg" data-model="person" alt="人员新示例：湖边游客">
+      <img src="server-examples/boat-3-oroville.jpg" data-model="boat" alt="船只新示例：湖面船群">
+      <img src="server-examples/boat-4-central-park.jpg" data-model="boat" alt="船只新示例：公园湖面船只">
+      <img src="server-examples/boat-5-phayao.jpg" data-model="boat" alt="船只新示例：湖面小船">
+      <p>上面 3 张是漂浮物，中间 3 张是人员，下面 3 张是船只，都是模型训练和验证时没见过的照片。</p>
     </div>
   </div>
 
