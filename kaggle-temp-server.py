@@ -12,10 +12,12 @@
 #
 # ---- Cell 2（以下全部是 Python，直接粘贴到一个 cell 里运行）----
 
+import os
 import re
 import subprocess
 import threading
 import time
+import urllib.request
 
 import gradio as gr
 import numpy as np
@@ -34,6 +36,27 @@ MODELS = {
 SESSIONS = {}
 
 print("ONNX providers available:", ort.get_available_providers(), flush=True)
+
+# 示例图：模型以前没见过的新照片，从 GitHub 仓库下载到本地（已去 EXIF，最宽 1280）
+EXAMPLE_DIR = "/kaggle/working/examples"
+EXAMPLE_FILES = [
+    ("debris-4-river-litter.jpg", "debris", 0.25),
+    ("debris-5-danube-bottle.jpg", "debris", 0.25),
+    ("debris-6-plastic-persistence.jpg", "debris", 0.25),
+    ("person-3-lake-walk.jpg", "person", 0.15),
+    ("person-4-lake-edward.jpg", "person", 0.15),
+    ("person-5-yellowstone.jpg", "person", 0.15),
+    ("boat-3-oroville.jpg", "boat", 0.15),
+    ("boat-4-central-park.jpg", "boat", 0.15),
+    ("boat-5-phayao.jpg", "boat", 0.15),
+]
+os.makedirs(EXAMPLE_DIR, exist_ok=True)
+for _fname, _, _ in EXAMPLE_FILES:
+    _path = os.path.join(EXAMPLE_DIR, _fname)
+    if not os.path.exists(_path):
+        _url = f"https://raw.githubusercontent.com/Sky-Sheepfold/reservoir-model-test/main/server-examples/{_fname}"
+        urllib.request.urlretrieve(_url, _path)
+        print("downloaded example", _fname, os.path.getsize(_path), "bytes", flush=True)
 
 
 def get_session(path):
@@ -165,6 +188,17 @@ with gr.Blocks(title="水库监控 · 三模型测试") as demo:
         "三个模型：漂浮物是训练好的（100 个能找到 71 个）；人员 100 个人能找到 70 个；"
         "船只 100 条船能找到 54 条。第一次用某个模型要先加载模型文件，请耐心等一下；"
         "人员和船只用的是同一个模型，来回切换不用重新加载。这是临时测试，链接只在测试期间有效。"
+    )
+    gr.Examples(
+        examples=[[os.path.join(EXAMPLE_DIR, f), m, c] for f, m, c in EXAMPLE_FILES],
+        inputs=[img_in, model_radio, conf_slider],
+        label="点一张试试（不用自己传照片）",
+    )
+    gr.Markdown(
+        "上面 9 张是新找的测试图，模型以前没见过：漂浮物 3 张（河面垃圾、多瑙河上的瓶子、水面漂浮的塑料）、"
+        "人员 3 张（湖边散步的人、黄石湖边的游客、爱德华湖的渔民）、船只 3 张（奥罗维尔湖的船、中央公园湖面的船、帕夭湖畔的小船）。"
+        "图来自 Wikimedia Commons（CC0/CC BY/CC BY-SA）和 Pexels（免费图库），都是能免费用的公开照片。"
+        "点一张会自动选好对应的模型，再点“开始检测”就行。"
     )
     model_radio.change(on_model_change, inputs=model_radio, outputs=conf_slider)
     run_btn.click(detect, inputs=[img_in, model_radio, conf_slider], outputs=[img_out, result_text])
