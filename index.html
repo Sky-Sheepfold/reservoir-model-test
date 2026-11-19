@@ -98,7 +98,7 @@
   </div>
 
   <div class="card foot">
-    说明：<br>1）推理在你的浏览器本地跑，照片不会上传到任何服务器。<br>2）第一次用某个模型要下载模型文件，之后再测就很快了；人员和船只用的是同一个模型，来回切换不用重新下载。<br>3）这只是测试页，不是正式部署。正式部署跑在显卡上，多路摄像头 24 小时不停。<br>4）这个页面没有每天的次数限制，想测多少次都行。
+    说明：<br>1）推理在你的浏览器本地跑，照片不会上传到任何服务器。<br>2）第一次用某个模型要下载模型文件，之后再测就很快了；人员和船只用的是同一个模型，来回切换不用重新下载。<br>3）这只是测试页，不是正式部署。正式部署跑在显卡上，多路摄像头 24 小时不停。<br>4）这个页面没有每天的次数限制，想测多少次都行。<br>5）如果一直卡在“正在把模型装进内存”，刷新页面再试，或换 Safari / Chrome 打开这个链接。
   </div>
 </div>
 
@@ -143,7 +143,11 @@ async function getOrt() {
         await loadScript(base + 'ort.min.js');
         if (window.ort) {
           ort.env.wasm.wasmPaths = base;
-          ort.env.wasm.numThreads = 4;
+          // 多线程 WASM 需要跨域隔离，GitHub Pages 没有这个响应头，手机内置浏览器里还容易卡住；直接用单线程最稳
+          ort.env.wasm.numThreads = window.crossOriginIsolated ? 4 : 1;
+          // 提前把 WASM 文件下载到缓存里，第一次检测就不用现下现等
+          const wasmFile = window.crossOriginIsolated ? 'ort-wasm-simd-threaded.wasm' : 'ort-wasm-simd.wasm';
+          fetch(base + wasmFile).catch(() => {});
           return window.ort;
         }
       } catch (e) { /* try next mirror */ }
@@ -184,9 +188,18 @@ async function getSession(modelKey) {
   setStatus('正在下载模型文件…');
   const url = await fetchWithProgress(m.file, p => setStatus('正在下载模型文件…' + Math.round(p * 100) + '%'));
   setStatus('正在把模型装进内存…');
-  const session = await ort.InferenceSession.create(url, { executionProviders: ['webgpu', 'wasm'] });
-  sessions[m.file] = session;
-  return session;
+  // 只用 CPU 跑（WASM）：手机内置浏览器里先走显卡那条路容易卡住不动；CPU 虽然慢一点但稳
+  const slowTimer = setTimeout(() => setStatus('还在把模型装进内存，请稍等一下…'), 20000);
+  try {
+    const session = await Promise.race([
+      ort.InferenceSession.create(url, { executionProviders: ['wasm'] }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('模型装载超时，请刷新页面重试；如果一直不行，换 Safari 或 Chrome 打开这个页面试试')), 90000))
+    ]);
+    sessions[m.file] = session;
+    return session;
+  } finally {
+    clearTimeout(slowTimer);
+  }
 }
 
 // ---- letterbox to 640 ----
